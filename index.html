@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Kumpul Mobil - Game 3D</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1e;
+            min-height: 100vh; color: #fff; overflow: hidden;
+        }
+        #gameContainer { position: relative; width: 100vw; height: 100vh; }
+        #canvas { display: block; width: 100%; height: 100%; }
+
+        .hud {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 10px;
+            border: 2px solid #00d4ff; font-size: 16px; z-index: 100;
+        }
+        .hud-item { margin: 6px 0; display: flex; justify-content: space-between; gap: 20px; }
+        .hud-label { color: #00d4ff; font-weight: bold; }
+        .hud-value { color: #00ff88; font-size: 20px; font-weight: bold; }
+
+        .game-info {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 10px;
+            border: 2px solid #ff006e; text-align: right; z-index: 100;
+        }
+        .game-title { font-size: 20px; font-weight: bold; color: #00d4ff; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        .game-stat { margin: 6px 0; color: #aaa; font-size: 14px; }
+        .game-stat-value { color: #00ff88; font-weight: bold; font-size: 16px; }
+
+        .speed-box {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.7); padding: 12px 15px; border-radius: 10px;
+            border: 2px solid #ffb703; z-index: 100; min-width: 160px;
+        }
+        .speed-title { color: #ffb703; margin-bottom: 8px; font-weight: bold; font-size: 13px; }
+        .speed-bar-bg { width: 100%; height: 16px; background: #333; border-radius: 8px; overflow: hidden; border: 1px solid #ffb703; }
+        .speed-bar-fill { height: 100%; background: linear-gradient(90deg, #ff006e, #ffb703, #00ff88); width: 0%; transition: width 0.1s; }
+        .speed-label { margin-top: 5px; font-size: 12px; color: #aaa; }
+
+        #dpad {
+            position: absolute; bottom: 30px; left: 30px;
+            z-index: 200; user-select: none; -webkit-user-select: none;
+        }
+        .dpad-row { display: flex; justify-content: center; }
+        .dpad-btn {
+            width: 58px; height: 58px;
+            background: rgba(0, 212, 255, 0.15);
+            border: 2px solid #00d4ff; border-radius: 10px;
+            color: #00d4ff; font-size: 22px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin: 3px;
+            transition: background 0.1s, transform 0.1s;
+            touch-action: none; -webkit-tap-highlight-color: transparent;
+        }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: rgba(0, 212, 255, 0.5); transform: scale(0.92);
+        }
+        .dpad-center {
+            width: 58px; height: 58px;
+            background: rgba(255,0,110,0.15); border: 2px solid #ff006e;
+            border-radius: 10px; color: #ff006e; font-size: 13px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin: 3px;
+            touch-action: none; -webkit-tap-highlight-color: transparent;
+        }
+        .dpad-center:active, .dpad-center.pressed { background: rgba(255,0,110,0.45); }
+
+        #btnRotate {
+            position: absolute; bottom: 230px; left: 30px; z-index: 200;
+            background: rgba(255,183,3,0.15); border: 2px solid #ffb703;
+            border-radius: 10px; color: #ffb703; font-size: 13px; font-weight: bold;
+            padding: 10px 16px; cursor: pointer;
+            touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none;
+        }
+        #btnRotate:active { background: rgba(255,183,3,0.45); }
+
+        .message {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.88); padding: 40px; border-radius: 15px;
+            border: 3px solid #00d4ff; text-align: center; z-index: 300; display: none;
+        }
+        .message h2 { font-size: 28px; color: #00d4ff; margin-bottom: 12px; }
+        .message p  { font-size: 16px; color: #aaa; margin-bottom: 20px; }
+        .message button {
+            background: linear-gradient(135deg, #00d4ff, #ff006e);
+            border: none; padding: 14px 36px; font-size: 15px;
+            border-radius: 8px; color: white; cursor: pointer; font-weight: bold;
+        }
+
+        #glbStatus {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); border: 2px solid #00d4ff;
+            border-radius: 10px; padding: 16px 28px;
+            color: #00d4ff; font-size: 15px; z-index: 400;
+            display: none; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="canvas"></canvas>
+
+    <div class="hud">
+        <div class="hud-item"><span class="hud-label">SKOR</span><span class="hud-value" id="score">0</span></div>
+        <div class="hud-item"><span class="hud-label">KUMPUL</span><span class="hud-value" id="collected">0</span></div>
+        <div class="hud-item"><span class="hud-label">KOMBO</span><span class="hud-value" id="combo">0x</span></div>
+    </div>
+
+    <div class="game-info">
+        <div class="game-title">🚗 Kumpul Mobil</div>
+        <div class="game-stat">FPS: <span class="game-stat-value" id="fps">60</span></div>
+        <div class="game-stat">Objek: <span class="game-stat-value" id="objCount">0</span></div>
+        <div class="game-stat">Waktu: <span class="game-stat-value" id="time">0s</span></div>
+    </div>
+
+    <div class="speed-box">
+        <div class="speed-title">⚡ KECEPATAN</div>
+        <div class="speed-bar-bg"><div class="speed-bar-fill" id="speedBar"></div></div>
+        <div class="speed-label"><span id="speedValue">0</span>%</div>
+    </div>
+
+    <button id="btnRotate">🔄 Putar Kamera</button>
+
+    <div id="dpad">
+        <div class="dpad-row">
+            <div style="width:64px"></div>
+            <div class="dpad-btn" id="btn-w">▲</div>
+            <div style="width:64px"></div>
+        </div>
+        <div class="dpad-row">
+            <div class="dpad-btn" id="btn-a">◀</div>
+            <div class="dpad-center" id="btn-pause">⏸</div>
+            <div class="dpad-btn" id="btn-d">▶</div>
+        </div>
+        <div class="dpad-row">
+            <div style="width:64px"></div>
+            <div class="dpad-btn" id="btn-s">▼</div>
+            <div style="width:64px"></div>
+        </div>
+    </div>
+
+    <div class="message" id="gameOverMessage">
+        <h2>⏸ DIJEDA</h2>
+        <p>Tekan tombol ⏸ atau SPACE untuk lanjut</p>
+        <button onclick="resumeGame()">▶ Lanjutkan</button>
+    </div>
+
+    <div id="glbStatus"></div>
+</div>
+
+<!-- Three.js r128 dari unpkg (lebih stabil) -->
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<!-- GLTFLoader dari unpkg — sama versi r128 -->
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+
+<script src="game.js"></script>
+<script>
+const btnMap = { 'btn-w': 'w', 'btn-s': 's', 'btn-a': 'a', 'btn-d': 'd' };
+
+function setKey(k, val) {
+    if (typeof keys !== 'undefined') {
+        keys[k] = val;
+        keys[k.toUpperCase()] = val;
+        // Juga set ArrowKey equivalen
+        const arrowMap = { w: 'ArrowUp', s: 'ArrowDown', a: 'ArrowLeft', d: 'ArrowRight' };
+        if (arrowMap[k]) keys[arrowMap[k]] = val;
+    }
+}
+
+Object.entries(btnMap).forEach(([id, k]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('mousedown',  (e) => { e.preventDefault(); setKey(k, true);  el.classList.add('pressed'); });
+    el.addEventListener('mouseup',    (e) => { e.preventDefault(); setKey(k, false); el.classList.remove('pressed'); });
+    el.addEventListener('mouseleave', (e) => { setKey(k, false); el.classList.remove('pressed'); });
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); setKey(k, true);  el.classList.add('pressed'); }, { passive: false });
+    el.addEventListener('touchend',   (e) => { e.preventDefault(); setKey(k, false); el.classList.remove('pressed'); }, { passive: false });
+    el.addEventListener('touchcancel',(e) => { e.preventDefault(); setKey(k, false); el.classList.remove('pressed'); }, { passive: false });
+});
+
+const btnPause = document.getElementById('btn-pause');
+btnPause.addEventListener('click', () => {
+    if (typeof gameState !== 'undefined') {
+        gameState.isGameRunning = !gameState.isGameRunning;
+        document.getElementById('gameOverMessage').style.display =
+            gameState.isGameRunning ? 'none' : 'block';
+    }
+});
+
+document.getElementById('btnRotate').addEventListener('click', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
+    setTimeout(() => document.dispatchEvent(new KeyboardEvent('keyup', { key: 'r' })), 100);
+});
+
+function resumeGame() {
+    if (typeof gameState !== 'undefined') {
+        gameState.isGameRunning = true;
+        document.getElementById('gameOverMessage').style.display = 'none';
+    }
+}
+
+window.addEventListener('blur', () => {
+    if (typeof keys !== 'undefined') Object.keys(keys).forEach(k => keys[k] = false);
+});
+</script>
+</body>
+</html>
